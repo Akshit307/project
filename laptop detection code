@@ -1,0 +1,46 @@
+import tensorflow as tf
+import numpy as np
+from flask import Flask, request, jsonify
+from PIL import Image
+import io
+
+app = Flask(__name__)
+
+class_names = ["cup", "bottle"]
+
+model = tf.keras.models.load_model("keras_model.h5")
+
+@app.route("/upload", methods=["POST"])
+def upload():
+    try:
+       
+        img = Image.open(request.files["image"]).convert("RGB")
+        img = img.resize((224, 224))  
+        img_array = np.array(img) / 255.0 
+        img_array = np.expand_dims(img_array, axis=0) 
+
+      
+        predictions = model.predict(img_array)
+        predicted_index = int(np.argmax(predictions[0]))
+        confidence = float(predictions[0][predicted_index])
+        predicted_label = class_names[predicted_index]
+
+        print("Prediction probs:", predictions[0])
+        print("Predicted:", predicted_label, "with confidence:", confidence)
+
+        
+        if predicted_label == "bottle":
+            response = {"item": "bottle", "recyclable": True}
+        elif predicted_label == "cup":
+            response = {"item": "cup", "recyclable": False}
+        else:
+            response = {"item": "unknown", "recyclable": False}
+
+        return jsonify(response)
+
+    except Exception as e:
+        print(" Error processing image:", str(e))
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
